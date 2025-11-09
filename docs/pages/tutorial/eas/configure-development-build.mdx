@@ -1,206 +1,558 @@
----
-title: Configure a development build in cloud
-sidebar_title: Configure development build
-description: Learn how to configure a development build for a project using EAS Build.
-hasVideoLink: true
----
+import React, { useState, useEffect, useRef } from "react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
+import { Play, Pause, X } from "lucide-react";
 
-import { Collapsible } from '~/ui/components/Collapsible';
-import { ContentSpotlight } from '~/ui/components/ContentSpotlight';
-import { ProgressTracker } from '~/ui/components/ProgressTracker';
-import { Terminal } from '~/ui/components/Snippet';
-import { Step } from '~/ui/components/Step';
-import { CODE } from '~/ui/components/Text';
-import { VideoBoxLink } from '~/ui/components/VideoBoxLink';
+const EXERCISES = [
+  { id: 1, name: "Corrida leve", type: "cardio", metric: "min" },
+  { id: 2, name: "Pular corda", type: "cardio", metric: "min" },
+  { id: 3, name: "Agachamento", type: "forca", metric: "reps" },
+  { id: 4, name: "Flexão", type: "forca", metric: "reps" },
+  { id: 5, name: "Prancha", type: "core", metric: "seg" },
+  { id: 6, name: "Burpee", type: "HIIT", metric: "reps" }
+];
 
-In this chapter, we'll set up and configure a development build with EAS for our example app.
+const save = (key, value) => {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { }
+};
 
-<VideoBoxLink videoId="uQCE9zl3dXU" title="Watch: How to configure a development build" />
+const load = (key, fallback) => {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+};
 
----
-
-## Understanding development builds
-
-Let's start by learning about what are development builds and why we need them.
-
-A [development build](/develop/development-builds/introduction/) is a debug version of our project. It is optimized for quick iterations when creating an app. It contains the [`expo-dev-client`](/versions/latest/sdk/dev-client/) library, which offers a robust and complete development environment. This setup allows us to integrate any native library or change code inside the [native directories](/workflow/overview/#android-and-ios-native-projects) as required.
-
-### Key highlights
-
-> **Note:** If you are familiar with [Expo Go](/get-started/expo-go/), think of a development build as a customizable version of Expo Go that is unique to the requirements of a project.
-
-| Feature                           | Development Builds                                                                                                                             | Expo Go                                                                                              |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Development phase**             | Offers web-like iteration speed for mobile app development.                                                                                    | Allows for quick iteration and testing of Expo SDK projects using the client app.                    |
-| **Collaboration**                 | Facilitates team testing with shared native runtime.                                                                                           | Easy project sharing via QR codes on a device.                                                       |
-| **Third-party libraries support** | Full support for any [third-party library](/workflow/using-libraries/#third-party-libraries), including those that require custom native code. | Limited to libraries within the Expo SDK, not suitable for custom native dependencies.               |
-| **Customization**                 | Extensive customization with [config plugins](/config-plugins/introduction/) and direct access to native code.                                 | Limited customization with a focus on Expo SDK capabilities without direct native code modification. |
-| **Intended use**                  | Ideal for full-fledged app development aimed at store deployment, offering a complete development environment and tools.                       | Ideal for learning, prototyping, and experimenting. Not recommended for production apps.             |
-
-<Step label="1">
-
-## Install expo-dev-client library
-
-To initialize our project for a development build, let's [`cd`](https://developer.mozilla.org/en-US/docs/Learn/Tools_and_testing/Understanding_client-side_tools/Command_line#basic_built-in_terminal_commands) inside our project directory and run the following command to install the library:
-
-<Terminal cmd={['$ npx expo install expo-dev-client']} />
-
-### Start the development server
-
-Run the `npx expo start` to start the [development server](/get-started/start-developing/#start-a-development-server):
-
-<Terminal cmd={['$ npx expo start']} />
-
-This command starts the metro bundler. In the terminal window, we see the QR code followed by the `Metro waiting on...` and a manifest URL:
-
-<ContentSpotlight
-  alt="Running development server"
-  src="/static/images/tutorial/eas/development-server.png"
-  className="max-w-[600px]"
-/>
-
-Let's notice the changes installing the `expo-dev-client` library:
-
-- The manifest URL contains `expo-development-client` along with the app scheme
-- The development server now operates for a development build (instead of Expo Go).
-
-Since we do not have a development build installed on one of our devices or an emulator/simulator, we can't run our project yet.
-
-</Step>
-
-<Step label="2">
-
-## Initialize a development build
-
-### Install EAS CLI
-
-We need to install the EAS Command Line Interface (CLI) tool as a global dependency on our local machine. Run the following command:
-
-<Terminal cmd={['$ npm install -g eas-cli']} />
-
-### Log in or sign up for an Expo account
-
-> If you have an Expo account and are signed in using Expo CLI, skip this step. If you don't have an Expo account, [sign up here](https://expo.dev/signup) and proceed with the login command described below.
-
-To log in, run the following command:
-
-<Terminal cmd={['$ eas login']} />
-
-This command asks for our Expo account email or username and password to complete the login.
-
-### Initialize and link the project to EAS
-
-For any new project, the first step is to initialize and link it to the EAS servers. Run the following command:
-
-<Terminal cmd={['$ eas init']} />
-
-On running, this command:
-
-- Requests verification of the account owner by entering our Expo account credentials and asks if we want to create a new EAS project:
-
-<Terminal
-  cmd={[
-    '# Output after running eas init',
-    '✔ Which account should own this project? > your-username',
-    '✔ Would you like to create a project for @your-username/sticker-smash? … yes',
-    '✔ Created @your-username/sticker-smash',
-    '✔ Project successfully linked (ID: XXXX-XX-XX-XXXX) (modified app.json)',
-  ]}
-/>
-
-- Creates EAS project and provides a link to that project which we can open in the EAS dashboard:
-
-<ContentSpotlight
-  alt="New project in EAS dashboard"
-  src="/static/images/tutorial/eas/new-project.png"
-/>
-
-- Generates a unique `projectId` and links this EAS project to the example app on our development machine.
-- Modifies **app.json** to include [`extra.eas.projectId`](/versions/latest/sdk/constants/#easconfig) and updates its value with the unique ID created.
-
-<Collapsible summary={<>What is <CODE>projectId</CODE> in app.json?</>}>
-
-When `eas init` runs, it associates a unique identifier for our project in **app.json** under `extra.eas.projectId`. The value of this property is used to identify our project on EAS servers.
-
-```json
-{
-  "extra": {
-    "eas": {
-      "projectId": "0cd3da2d-xxx-xxx-xxx-xxxxxxxxxx"
-    }
-  }
+export default function CombinedApp() {
+  const [view, setView] = useState("landing");
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {view === "landing" ? <LandingSite onStart={() => setView("app")} /> : <App onBack={() => setView("landing")} />}
+    </div>
+  );
 }
-```
 
-</Collapsible>
+function LandingSite({ onStart }){
+  return (
+    <div className="max-w-6xl mx-auto py-12 px-6">
+      <header className="flex items-center justify-between">
+        <h1 className="text-3xl font-extrabold tracking-tight">FitFlow — Melhore seu condicionamento</h1>
+        <nav className="flex items-center gap-4">
+          <button className="px-4 py-2 rounded-md text-sm bg-white shadow" onClick={() => window.scrollTo({ top: 400, behavior: 'smooth' })}>Recursos</button>
+          <button className="px-4 py-2 rounded-md text-sm bg-white shadow" onClick={() => window.scrollTo({ top: 800, behavior: 'smooth' })}>Planos</button>
+          <button className="px-4 py-2 rounded-md text-sm bg-indigo-600 text-white" onClick={onStart}>Experimente grátis</button>
+        </nav>
+      </header>
 
-</Step>
+      <main className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <div>
+          <h2 className="text-2xl font-bold">Treinos personalizados, rápidos e fáceis de seguir</h2>
+          <p className="mt-4 text-gray-600">Gere treinos em segundos, acompanhe seu progresso e faça um quiz simples antes de começar para receber recomendações personalizadas.</p>
 
-<Step label="3">
+          <ul className="mt-6 space-y-2 text-gray-700">
+            <li>• Gerador de treino por objetivo e duração</li>
+            <li>• Timer HIIT integrado</li>
+            <li>• Histórico e gráficos de progresso</li>
+          </ul>
 
-## Configure project for EAS Build
+          <div className="mt-8 flex gap-3">
+            <button className="px-6 py-3 rounded-2xl bg-emerald-600 text-white font-semibold" onClick={onStart}>Quero testar o plano</button>
+            <a className="px-6 py-3 rounded-2xl bg-white shadow text-sm" href="#planos">Ver planos</a>
+          </div>
+        </div>
 
-To set up our project for EAS Build, run the following command:
+        <div className="p-6 rounded-2xl bg-white shadow">
+          <h3 className="font-semibold">Preview do app</h3>
+          <PreviewCard />
+        </div>
+      </main>
 
-<Terminal cmd={['$ eas build:configure']} />
+      <section id="recursos" className="mt-12">
+        <h3 className="text-xl font-bold">Como funciona</h3>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Feature title="Gerador Inteligente" desc="Escolha objetivo, intensidade e duração — receba um treino pronto." />
+          <Feature title="Quiz Inicial" desc="3 perguntas rápidas para ajustar o plano ao seu nível." />
+          <Feature title="Progresso visível" desc="Gráficos simples que mostram sua consistência." />
+        </div>
+      </section>
 
-On running, this command:
+      <section id="planos" className="mt-12 bg-white p-6 rounded-2xl shadow">
+        <h3 className="text-xl font-bold">Planos</h3>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <PlanCard title="Grátis" price="R$0" perks={["Gerador de treino", "Histórico local"]} />
+          <PlanCard title="Pro" price="R$14,90/mês" perks={["Planos personalizados", "Backup na nuvem"]} featured />
+          <PlanCard title="Equipe" price="Sob consulta" perks={["Treinos em grupo", "Suporte prioritário"]} />
+        </div>
+      </section>
 
-- Prompts to select a platform: **Android**, **iOS**, or **All**. Since we are creating Android and iOS apps, let's select **All**.
-- Creates **eas.json** in the root of our project's directory with the following configuration:
-
-```json eas.json
-{
-  "cli": {
-    "version": ">= 16.18.0",
-    "appVersionSource": "remote"
-  },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
-    },
-    "preview": {
-      "distribution": "internal"
-    },
-    "production": {
-      "autoIncrement": true
-    }
-  },
-  "submit": {
-    "production": {}
-  }
+      <footer className="mt-12 text-center text-sm text-gray-500">© {new Date().getFullYear()} FitFlow — Feito para movimento.</footer>
+    </div>
+  );
 }
-```
 
-This is the default configuration for **eas.json** in a new project. It does two things:
+function Feature({ title, desc }){
+  return (
+    <div className="p-4 border rounded-lg">
+      <h4 className="font-semibold">{title}</h4>
+      <p className="mt-2 text-sm text-gray-600">{desc}</p>
+    </div>
+  );
+}
 
-- Defines the current EAS CLI version.
-- Adds three [build profiles](/build/eas-json/#build-profiles): `development`, `preview`, and `production`.
+function PlanCard({ title, price, perks, featured }){
+  return (
+    <div className={`p-4 rounded-lg ${featured ? 'border-2 border-indigo-200' : 'border'}`}>
+      <div className="flex items-baseline justify-between">
+        <div>
+          <div className="text-lg font-bold">{title}</div>
+          <div className="text-sm text-gray-500">{price}</div>
+        </div>
+        {featured && <div className="text-xs bg-indigo-600 text-white px-2 py-1 rounded">Mais popular</div>}
+      </div>
+      <ul className="mt-3 text-sm space-y-1">
+        {perks.map((p,i) => <li key={i}>• {p}</li>)}
+      </ul>
+      <div className="mt-4">
+        <button className="w-full px-3 py-2 rounded bg-indigo-600 text-white">Assinar</button>
+      </div>
+    </div>
+  );
+}
 
-</Step>
+function PreviewCard(){
+  return (
+    <div className="mt-4 grid grid-cols-1 gap-3">
+      <div className="p-3 border rounded flex justify-between items-center">
+        <div>
+          <div className="text-sm font-medium">Gerador de treino</div>
+          <div className="text-xs text-gray-500">Resistência · 30 min</div>
+        </div>
+        <div className="text-xs text-gray-500">Ver</div>
+      </div>
+      <div className="p-3 border rounded flex justify-between items-center">
+        <div>
+          <div className="text-sm font-medium">HIIT Timer</div>
+          <div className="text-xs text-gray-500">30s on / 30s off</div>
+        </div>
+        <div className="text-xs text-gray-500">Ver</div>
+      </div>
+    </div>
+  );
+}
 
-<Collapsible summary="Explore development profile further">
+function App({ onBack }) {
+  const [profile, setProfile] = useState(() => load('profile', { name: 'Usuário', level: 'iniciante', weight: 70 }));
+  const [history, setHistory] = useState(() => load('history', []));
+  const [workouts, setWorkouts] = useState(() => load('workouts', []));
+  const [selectedGoal, setSelectedGoal] = useState('resistencia');
+  const [intensity, setIntensity] = useState('moderado');
+  const [duration, setDuration] = useState(30);
+  const [currentWorkout, setCurrentWorkout] = useState(null);
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [quizResult, setQuizResult] = useState(null);
 
-**eas.json** is a collection of different build profiles. Each profile is tailored with distinct configurations to produce specific build types. These profiles can also include platform-specific settings for Android or iOS.
+  useEffect(() => save('profile', profile), [profile]);
+  useEffect(() => save('history', history), [history]);
+  useEffect(() => save('workouts', workouts), [workouts]);
 
-Currently, our focus is on the `development` profile, which includes the following configuration:
+  function generateWorkout(fromQuiz = false) {
+    const pool = EXERCISES.filter(e => {
+      if (selectedGoal === 'forca') return e.type === 'forca';
+      if (selectedGoal === 'resistencia') return e.type === 'cardio' || e.type === 'HIIT';
+      if (selectedGoal === 'core') return e.type === 'core' || e.type === 'forca';
+      return true;
+    });
 
-- [`developmentClient`](/eas/json/#developmentclient): Enabled (`true`) for creating a debug build. It loads the app using the `expo-dev-client` library, which provides development tools and generates a build artifact for device or emulator/simulator installation and allows using the app for local development as it supports updating the JavaScript on the fly.
-- [`distribution`](/eas/json/#distribution): Configured as `internal` to indicate that we want to share the build internally (instead of uploading it on app stores).
+    const sets = Math.max(3, Math.round(duration / 10));
+    const chosen = [];
+    for (let i = 0; i < Math.min(5, pool.length); i++) {
+      const idx = Math.floor(Math.random() * pool.length);
+      const ex = pool[idx];
+      const target = ex.metric === 'min' ? Math.max(1, Math.round(duration / 5)) : ex.metric === 'seg' ? 30 + i * 15 : 8 + i * 4;
+      chosen.push({ ...ex, sets, target });
+    }
 
-> **Note**: Builds offer extensive customization options, including platform-specific settings and the ability to extend configurations across different build profiles. Learn more about [customizing build profiles](/build/eas-json/#build-profiles).
+    const workout = { id: Date.now(), date: new Date().toISOString(), goal: selectedGoal, intensity, duration, exercises: chosen, recommendedFromQuiz: fromQuiz };
+    setCurrentWorkout(workout);
+    setWorkouts(prev => [workout, ...prev].slice(0, 50));
+  }
 
-</Collapsible>
+  function completeWorkout() {
+    if (!currentWorkout) return;
+    const entry = { ...currentWorkout, completedAt: new Date().toISOString() };
+    setHistory(prev => [entry, ...prev].slice(0, 200));
+    setCurrentWorkout(null);
+  }
 
-## Summary
+  return (
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-6">
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-white shadow">
+            <div>
+              <h1 className="text-2xl font-bold">FitFlow</h1>
+              <p className="text-sm text-gray-500">App protótipo para melhorar condicionamento físico</p>
+            </div>
+            <div className="flex gap-2">
+              <button className="px-3 py-2 rounded bg-gray-100" onClick={onBack}>Voltar ao site</button>
+              <div className="text-right">
+                <div className="text-sm">{profile.name}</div>
+                <div className="text-xs text-gray-500">{profile.weight} kg · {profile.level}</div>
+              </div>
+            </div>
+          </div>
 
-<ProgressTracker
-  currentChapterIndex={0}
-  name="EAS_TUTORIAL"
-  summary="
-We successfully used the EAS CLI to initialize, and configure our project, link it to EAS servers, and prepare a development build."
-  nextChapterDescription="In the next chapter, let's create a development build for Android, install it on a device and an emulator, and get it running with the development server."
-  nextChapterTitle="Create and run a cloud build for Android"
-  nextChapterLink="/tutorial/eas/android-development-build/"
-/>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 rounded-2xl shadow bg-white">
+              <h3 className="text-lg font-semibold">Gerador de treino</h3>
+              <div className="mt-3 space-y-2">
+                <label className="block">Objetivo</label>
+                <select className="w-full p-2 rounded" value={selectedGoal} onChange={e => setSelectedGoal(e.target.value)}>
+                  <option value="resistencia">Resistência / Cardio</option>
+                  <option value="forca">Força</option>
+                  <option value="core">Core / Estabilidade</option>
+                </select>
+
+                <label>Intensidade</label>
+                <select className="w-full p-2 rounded" value={intensity} onChange={e => setIntensity(e.target.value)}>
+                  <option>leve</option>
+                  <option>moderado</option>
+                  <option>intenso</option>
+                </select>
+
+                <label>Duração (min)</label>
+                <input type="range" min={10} max={90} value={duration} onChange={e => setDuration(Number(e.target.value))} />
+                <div className="flex justify-between text-sm"><span>10</span><span>{duration} min</span><span>90</span></div>
+
+                <div className="flex gap-2 mt-3">
+                  <button className="px-4 py-2 rounded-2xl shadow bg-indigo-600 text-white" onClick={() => setQuizOpen(true)}>Fazer quiz rápido</button>
+                  <button className="px-4 py-2 rounded-2xl shadow bg-gray-200" onClick={() => { setSelectedGoal('resistencia'); setIntensity('moderado'); setDuration(30); }}>Resetar</button>
+                </div>
+
+                <div className="flex gap-2 mt-3">
+                  <button className="px-4 py-2 rounded-2xl bg-green-500 text-white" onClick={() => generateWorkout(false)}>Gerar treino</button>
+                  <button className="px-4 py-2 rounded-2xl bg-yellow-100" onClick={() => { setProfile(p => ({ ...p, level: p.level === 'iniciante' ? 'intermediario' : 'iniciante' })); }}>Alternar nível</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl shadow bg-white">
+              <h3 className="text-lg font-semibold">Treino atual</h3>
+              {currentWorkout ? (
+                <div className="mt-3">
+                  <p className="text-sm">Objetivo: <strong>{currentWorkout.goal}</strong> · {currentWorkout.duration} min · {currentWorkout.intensity}</p>
+                  <ul className="mt-2 space-y-2">
+                    {currentWorkout.exercises.map(ex => (
+                      <li key={ex.id} className="p-2 rounded border">{ex.name} — {ex.target} {ex.metric} · {ex.sets} séries</li>
+                    ))}
+                  </ul>
+                  <div className="flex gap-2 mt-3">
+                    <button className="px-4 py-2 rounded-2xl bg-green-500 text-white" onClick={completeWorkout}>Concluir</button>
+                    <HIITTimer />
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-gray-600">Nenhum treino gerado. Use o gerador ou faça o quiz rápido.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl shadow bg-white">
+            <h3 className="text-lg font-semibold">Histórico</h3>
+            {history.length === 0 ? <p className="text-sm mt-2 text-gray-600">Nenhum treino concluído ainda.</p> : (
+              <div className="mt-3 space-y-2">
+                {history.slice(0,6).map(h => (
+                  <div key={h.id} className="p-2 rounded border flex justify-between items-center">
+                    <div>
+                      <div className="text-sm font-medium">{h.goal} · {h.duration} min</div>
+                      <div className="text-xs text-gray-500">Concluído: {new Date(h.completedAt).toLocaleString()}</div>
+                    </div>
+                    <div className="text-sm">Exs: {h.exercises.length}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        <aside className="space-y-6">
+          <div className="p-4 rounded-2xl shadow bg-white">
+            <h4 className="font-semibold">Progresso</h4>
+            <ProgressChart history={history} />
+          </div>
+
+          <div className="p-4 rounded-2xl shadow bg-white">
+            <h4 className="font-semibold">Planos salvos</h4>
+            {workouts.length === 0 ? <p className="text-sm text-gray-500">Nenhum plano salvo.</p> : (
+              <ul className="space-y-2 mt-2">
+                {workouts.slice(0,6).map(w => (
+                  <li key={w.id} className="p-2 rounded border flex justify-between items-center">
+                    <div>
+                      <div className="text-sm font-medium">{w.goal} · {w.duration} min</div>
+                      <div className="text-xs text-gray-500">Gerado: {new Date(w.date).toLocaleDateString()}</div>
+                    </div>
+                    <div className="flex gap-1">
+                      <button className="px-2 py-1 rounded bg-gray-100" onClick={() => setCurrentWorkout(w)}>Abrir</button>
+                      <button className="px-2 py-1 rounded bg-red-100" onClick={() => setWorkouts(prev => prev.filter(x => x.id !== w.id))}>Excluir</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="p-4 rounded-2xl shadow bg-white">
+            <h4 className="font-semibold">Configurações rápidas</h4>
+            <div className="mt-2 text-sm text-gray-600">Nível: {profile.level}</div>
+          </div>
+
+        </aside>
+      </div>
+
+      {quizOpen && <QuizModal onClose={() => setQuizOpen(false)} onSubmit={(result) => { setQuizResult(result); setQuizOpen(false); generateWorkout(true); }} />}
+    </div>
+  );
+}
+
+function ProgressChart({ history }){
+  const map = {};
+  history.forEach(h => {
+    const d = h.completedAt ? new Date(h.completedAt).toLocaleDateString() : new Date(h.date).toLocaleDateString();
+    map[d] = (map[d] || 0) + 1;
+  });
+  const entries = Object.entries(map).sort((a,b) => new Date(a[0]) - new Date(b[0]));
+  const chartData = entries.slice(-14).map(([day, count]) => ({ day, count }));
+
+  if (chartData.length === 0) return <p className="text-sm text-gray-500 mt-2">Sem dados para mostrar.</p>;
+
+  return (
+    <div style={{ height: 160 }} className="mt-2">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="day" hide />
+          <YAxis allowDecimals={false} />
+          <Tooltip />
+          <Line type="monotone" dataKey="count" stroke="#8884d8" strokeWidth={3} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function HIITTimer(){
+  const [running, setRunning] = useState(false);
+  const [secs, setSecs] = useState(30);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!running) return;
+    ref.current = setInterval(() => setSecs(s => s - 1), 1000);
+    return () => clearInterval(ref.current);
+  }, [running]);
+
+  useEffect(() => {
+    if (secs <= 0 && running) {
+      clearInterval(ref.current);
+      setRunning(false);
+      setSecs(30);
+    }
+  }, [secs, running]);
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="text-sm px-3 py-2 rounded bg-gray-100">{secs}s</div>
+      <button className="px-3 py-2 rounded bg-indigo-600 text-white flex items-center gap-2" onClick={() => setRunning(r => !r)}>
+        {running ? <Pause size={16} /> : <Play size={16} />}
+        {running ? 'Pausar' : 'Iniciar'}
+      </button>
+    </div>
+  );
+}
+
+function QuizModal({ onClose, onSubmit }){
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState({ level: null, freq: null, prefer: null });
+
+  const questions = [
+    { key: 'level', q: 'Como você avalia seu condicionamento atual?', opts: ['Iniciante', 'Intermediário', 'Avançado'] },
+    { key: 'freq', q: 'Quantos dias por semana você pretende treinar?', opts: ['1-2', '3-4', '5+'] },
+    { key: 'prefer', q: 'Você prefere treinos mais curtos e intensos ou longos e moderados?', opts: ['Curtos e intensos', 'Longos e moderados', 'Sem preferência'] }
+  ];
+
+  function choose(opt){
+    const key = questions[step].key;
+    setAnswers(a => ({ ...a, [key]: opt }));
+  }
+
+  function next(){
+    if (!answers[questions[step].key]) return;
+    if (step < questions.length - 1) setStep(s => s + 1);
+    else submit();
+  }
+
+  function submit(){
+    onSubmit({ ...answers });
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6">
+        <div className="flex justify-between items-center">
+          <h4 className="font-semibold">Quiz rápido ({step+1}/{questions.length})</h4>
+          <button onClick={onClose}><X /></button>
+        </div>
+        <div className="mt-4">
+          <div className="font-medium">{questions[step].q}</div>
+          <div className="mt-3 grid grid-cols-1 gap-2">
+            {questions[step].opts.map(o => (
+              <button key={o} onClick={() => choose(o)} className={`w-full text-left p-3 rounded ${answers[questions[step].key] === o ? 'border-2 border-indigo-500' : 'border'}`}>
+                {o}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button className="px-4 py-2 rounded bg-gray-100" onClick={onClose}>Cancelar</button>
+          <button className="px-4 py-2 rounded bg-indigo-600 text-white" onClick={next}>Próximo</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaymentSelector({ value, onChange }){
+  return (
+    <div className="space-y-2">
+      <div className="text-sm font-medium">Escolha o pagamento</div>
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={() => onChange('A')} className={`p-2 rounded border ${value==='A' ? 'border-indigo-500' : ''}`}>A — Cartão (Stripe)</button>
+        <button onClick={() => onChange('B')} className={`p-2 rounded border ${value==='B' ? 'border-indigo-500' : ''}`}>B — PIX</button>
+        <button onClick={() => onChange('C')} className={`p-2 rounded border ${value==='C' ? 'border-indigo-500' : ''}`}>C — Boleto</button>
+        <button onClick={() => onChange('D')} className={`p-2 rounded border ${value==='D' ? 'border-indigo-500' : ''}`}>D — PayPal</button>
+      </div>
+    </div>
+  );
+}
+
+function ModelSelector({ value, onChange }){
+  return (
+    <div className="space-y-2">
+      <div className="text-sm font-medium">Escolha o modelo</div>
+      <div className="grid grid-cols-3 gap-2">
+        <button onClick={() => onChange(1)} className={`p-2 rounded border ${value===1 ? 'border-indigo-500' : ''}`}>1 — Mensal</button>
+        <button onClick={() => onChange(2)} className={`p-2 rounded border ${value===2 ? 'border-indigo-500' : ''}`}>2 — Anual</button>
+        <button onClick={() => onChange(3)} className={`p-2 rounded border ${value===3 ? 'border-indigo-500' : ''}`}>3 — Vitalício</button>
+      </div>
+    </div>
+  );
+}
+
+function ComprarViaPIX({ planId }){
+  const [qrCode, setQrCode] = useState(null);
+  const [payload, setPayload] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleBuy(){
+    try{
+      setLoading(true);
+      const res = await fetch('/api/pix/create-charge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId })
+      });
+      if (!res.ok) throw new Error('Erro ao criar cobrança');
+      const data = await res.json();
+      setQrCode(data.qrCodeBase64 || null);
+      setPayload(data.copyPasteCode || null);
+    }catch(e){
+      console.error(e);
+    }finally{ setLoading(false); }
+  }
+
+  return (
+    <div className="space-y-4">
+      <button onClick={handleBuy} disabled={loading} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold">
+        Comprar via PIX (Vitalício)
+      </button>
+      {qrCode && (
+        <div className="text-center space-y-2">
+          <img src={`data:image/png;base64,${qrCode}`} alt="QR Code PIX" className="mx-auto w-48 h-48" />
+          {payload && <button onClick={() => navigator.clipboard.writeText(payload)} className="text-sm underline text-indigo-500">Copiar código PIX</button>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PaymentDirectScreen(){
+  const _pixKey = "106.767.062-90"; // mantido apenas em memória, não exibido
+  const [status, setStatus] = useState("aguardando_pagamento");
+  const [file, setFile] = useState(null);
+  const [qrCode, setQrCode] = useState(null);
+  const [paymentUrl, setPaymentUrl] = useState(null);
+  const [loadingQr, setLoadingQr] = useState(false);
+
+  const sendProof = async () =>{
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('comprovante', file);
+    try{
+      const res = await fetch('/api/pagamento-direto/upload', { method: 'POST', body: formData });
+      if (res.ok) setStatus('em_validacao');
+    }catch(e){ console.error(e); }
+  };
+
+  const generateQrAndLink = async () => {
+    try{
+      setLoadingQr(true);
+      const res = await fetch('/api/pix/generate-qrcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pixKey: _pixKey })
+      });
+      if (!res.ok) throw new Error('Erro ao gerar QR');
+      const data = await res.json();
+      setQrCode(data.qrCodeBase64 || null);
+      setPaymentUrl(data.paymentUrl || null);
+    }catch(e){ console.error(e); }
+    finally{ setLoadingQr(false); }
+  };
+
+  return (
+    <div className="p-4 border rounded-lg space-y-4">
+      <h2 className="text-lg font-semibold">Pagamento Direto (PIX / Depósito)</h2>
+
+      <div>
+        <div className="text-sm">Pagamento via QR Code</div>
+        <div className="mt-2">
+          <button onClick={generateQrAndLink} disabled={loadingQr} className="px-4 py-2 rounded bg-indigo-600 text-white">Gerar QR e link de pagamento</button>
+        </div>
+      </div>
+
+      {qrCode && (
+        <div className="text-center">
+          <img src={`data:image/png;base64,${qrCode}`} alt="QR Code PIX" className="mx-auto w-48 h-48" />
+          {paymentUrl && (
+            <div className="mt-2 flex justify-center gap-2">
+              <a href={paymentUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 rounded bg-green-500 text-white">Abrir link de pagamento</a>
+              <button onClick={() => navigator.clipboard.writeText(paymentUrl)} className="px-3 py-2 rounded bg-gray-100">Copiar link</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div>
+        <div className="text-sm">Envie o comprovante (opcional)</div>
+        <input type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} />
+        <div className="mt-2 flex gap-2">
+          <button onClick={sendProof} className="px-3 py-2 rounded bg-indigo-600 text-white">Enviar Comprovante</button>
+          <button onClick={() => setStatus('aguardando_pagamento')} className="px-3 py-2 rounded bg-gray-100">Cancelar</button>
+        </div>
+      </div>
+
+      <div>
+        {status === 'aguardando_pagamento' && <div className="text-sm text-gray-600">Status: Aguardando pagamento</div>}
+        {status === 'em_validacao' && <div className="text-sm text-yellow-600">Status: Em validação...</div>}
+        {status === 'aprovado' && <div className="text-sm text-green-600">Status: ✅ Pagamento confirmado</div>}
+      </div>
+    </div>
+  );
+}
